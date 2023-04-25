@@ -11,7 +11,6 @@ import (
 	"platzi.com/go/rest-ws-go/handlers"
 	"platzi.com/go/rest-ws-go/middleware"
 	"platzi.com/go/rest-ws-go/server"
-	"platzi.com/go/rest-ws-go/websocket"
 )
 
 func main() {
@@ -38,14 +37,21 @@ func main() {
 }
 
 func BindRoutes(s server.Server, r *mux.Router) {
-	hub := websocket.NewHub()
+	api := r.PathPrefix("/api/v1").Subrouter() // Creamos un subrouter  para que el middelware lo use en vez del principal
+	// Todas las rutas que lleven api antes seran protegidas
+	api.Use(middleware.CheckAuthMiddleware(s)) // para cada una de las ruta utilice el middleware
 
-	r.Use(middleware.CheckAuthMiddleware(s)) // para cada una de las ruta utilice el middleware
 	r.HandleFunc("/", handlers.HomeHandler(s)).Methods(http.MethodGet)
-	r.HandleFunc("/signup", handlers.SignUpHandler(s)).Methods(http.MethodPost)
-	r.HandleFunc("/login", handlers.LoginHandler(s)).Methods(http.MethodPost)
-	r.HandleFunc("/me", handlers.MeHandler(s)).Methods(http.MethodGet)
-	r.HandleFunc("/posts", handlers.InsertPostHandler(s)).Methods(http.MethodPost)
-	r.HandleFunc("/posts/{id}", handlers.GetPostByIdHandler(s)).Methods(http.MethodGet)
-	r.HandleFunc("/ws", s.Hub().HandleWebSocket)
+
+	r.HandleFunc("/api/v1/signup", handlers.SignUpHandler(s)).Methods(http.MethodPost)
+	r.HandleFunc("/api/v1/login", handlers.LoginHandler(s)).Methods(http.MethodPost)
+	api.HandleFunc("/me", handlers.MeHandler(s)).Methods(http.MethodGet)
+
+	api.HandleFunc("/posts", handlers.InsertPostHandler(s)).Methods(http.MethodPost)
+	api.HandleFunc("/posts/{postId}", handlers.DeletePostByIdHandler(s)).Methods(http.MethodDelete)
+	api.HandleFunc("/posts/{postId}", handlers.UpdatePostByIdHandler(s)).Methods(http.MethodPut)
+	r.HandleFunc("/api/v1/posts/{postId}", handlers.GetPostByIdHandler(s)).Methods(http.MethodGet)
+	r.HandleFunc("/api/v1/posts", handlers.ListPostHandler(s)).Methods(http.MethodGet)
+
+	r.HandleFunc("/ws", s.Hub().HandleWebSocket) // hacemos que el websocket sea de manera publica
 }

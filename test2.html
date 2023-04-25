@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta http-equiv="X-UA-Compatible" content="IE=edge">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Websockets test</title>
+   <style>
+      :root {
+         font-family: sans-serif;
+      }
+      .post {
+         background-color: #0087b2;
+         border-radius: 5px;
+         margin-bottom: 1rem;
+         padding: 0.5rem 1rem; 
+      }
+
+      .post-title {
+         margin: 0.5rem 0;
+      }
+
+      #new-posts-container .post{
+         background-color: hsl(0, 49%, 49%);
+      }
+   </style>
+</head>
+<body>
+   <h1>Post application Tester</h1>
+   <div>
+      <h2>Posts actuales</h2>
+      <div id="actual-posts-container">
+      </div>
+
+      <h2>Posts Recien Creados</h2>
+      <div id="new-posts-container">
+      </div>
+   </div>
+
+   <script>
+      // IMPORTANTE: aqui deben cambiar el server por "localhost" o su direccion ip si quieren acceder desde otros dispositivos
+      const SERVER_URL = "http://localhost:5050/api/v1/posts"
+	const WS_URL = "ws://localhost:5050/ws"
+      // ↓ Aqui pueden pegar su token generado en el login si quieren dejar las rutas protegidas pero aun así poder obtener los posts
+      const AUTHORIZATION_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIyT3RXNnZNSDU3QkhIVmY3Y3JIcU5QVGRPMnYiLCJleHAiOjE2ODI1NTMwMzF9.OLcboufiC4Lro4WmJ2OmiGQhsBg3OTVP3APhQ9WSJ0Q"
+
+      let actualPostsContainer = document.getElementById("actual-posts-container");
+      let newPostsContainer = document.getElementById("new-posts-container");
+
+      function insertPost(postData, container) {
+         let postTemplate = `
+            <div class="post">
+               <h4 class="post-title">${postData.postContent}</h4>
+               <small>
+                  <span>Fecha: <b>${new Date(postData.createdAt).toDateString()}</b></span>
+                  <br>
+                  <span>Creado por: <b>${postData.userId}</b></span>
+               </small>
+            </div>
+            `
+
+         container.insertAdjacentHTML("afterbegin", postTemplate)
+      }
+
+      fetch(SERVER_URL, {
+         method: "GET",
+         headers: {
+            "Content-Type": "application/json"
+         }
+      }).then(res => {
+         if (res.ok) {
+            return res.json()
+         } else {
+            console.log(res.statusText)
+         }
+      }).then(postsArray => {
+         postsArray.forEach(post => {
+            insertPost(post, actualPostsContainer)
+         })
+      }).catch(err => console.log(err))
+
+      const ws = new WebSocket(WS_URL);
+
+      ws.onopen = (ev) => {
+         console.log("successfully connected to the websocket server")
+      }
+
+      ws.onmessage = (ev) => {
+         let socketMessage = JSON.parse(ev.data);
+
+         if (socketMessage.type == "Post_Created") {
+            let newPost = socketMessage.payload
+
+            insertPost(newPost, newPostsContainer)
+         }
+      }
+
+      ws.onerror = (ev) => {
+         alert("Error connecting to websockets")
+      }
+   </script>
+</body>
+</html>

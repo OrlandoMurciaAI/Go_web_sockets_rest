@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 	database "platzi.com/go/rest-ws-go/database"
 	repository "platzi.com/go/rest-ws-go/repository"
 	"platzi.com/go/rest-ws-go/websocket"
@@ -40,24 +41,6 @@ func (b *Broker) Hub() *websocket.Hub {
 	return b.hub
 }
 
-// Este metodo le permite a nuestr broker levantarse
-func (b *Broker) Start(binder func(s Server, r *mux.Router)) {
-	b.router = mux.NewRouter()
-	binder(b, b.router)
-	repo, err := database.NewPostgresRepository(b.config.DatabaseUrl)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	go b.hub.Run()
-	repository.SetRepository(repo)
-
-	log.Println("Starting server on port", b.Config().Port)
-	if err := http.ListenAndServe(b.config.Port, b.router); err != nil {
-		log.Fatal("ListenAndServer: ", err) // Se sale del programa despues de mostrar un mensaje
-	}
-}
-
 // El contexto sirve para encontrar posibles problemas
 // dentro de nuestra aplicación
 func NewServer(ctx context.Context, config *Config) (*Broker, error) {
@@ -79,4 +62,23 @@ func NewServer(ctx context.Context, config *Config) (*Broker, error) {
 		hub:    websocket.NewHub(),
 	}
 	return broker, nil
+}
+
+// Este metodo le permite a nuestr broker levantarse
+func (b *Broker) Start(binder func(s Server, r *mux.Router)) {
+	b.router = mux.NewRouter()
+	binder(b, b.router)
+	handler := cors.Default().Handler(b.router) // para que la api pueda conectarse a cualquier lugar)
+	repo, err := database.NewPostgresRepository(b.config.DatabaseUrl)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	go b.hub.Run()
+	repository.SetRepository(repo)
+
+	log.Println("Starting server on port", b.Config().Port)
+	if err := http.ListenAndServe(b.config.Port, handler); err != nil {
+		log.Fatal("ListenAndServer: ", err) // Se sale del programa despues de mostrar un mensaje
+	}
 }
